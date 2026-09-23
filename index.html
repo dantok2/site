@@ -449,7 +449,7 @@ const app=document.getElementById('app');
 const storageKey='tochka-a-audit-v'+VERSION;
 const leadStorageKey='tochka-a-lead-v1';
 const publicOrigin='https://tochka-a-personal-audit.myznikova39.chatgpt.site';
-const apiUrl=path=>new URL(path,location.protocol==='file:'?publicOrigin:location.origin).href;
+const apiUrl=path=>new URL(path,publicOrigin).href;
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brief=(text,max=1)=>{const parts=String(text??'').match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)||[];return parts.slice(0,max).join(' ').trim();};
 const paths={
