@@ -496,16 +496,22 @@ function leadId(){try{const existing=localStorage.getItem('tochka-a-lead-id');if
 async function submitLead(form){if(!form.reportValidity())return;const button=form.querySelector('button[type="submit"]'),error=document.getElementById('lead-error');const formData=new FormData(form);leadDraft={fullName:String(formData.get('fullName')||'').trim(),telegram:String(formData.get('telegram')||'').trim(),instagram:String(formData.get('instagram')||'').trim(),source:String(formData.get('source')||'').trim()};if(!Object.values(leadDraft).every(Boolean))return;button.disabled=true;button.innerHTML=`СОХРАНЯЕМ ${icon('arrow')}`;error.textContent='';const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);try{if(!CONFIG.leadEndpoint)throw new Error('endpoint');const body=new URLSearchParams({...leadDraft,website:'',leadId:leadId(),page:location.href});const response=await apiPost(CONFIG.leadEndpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,signal:controller.signal,keepalive:true});if(response.type!=='opaque'){const result=await response.json().catch(()=>null);if(!response.ok||result?.ok!==true)throw new Error('save');}leadSubmitted=true;try{localStorage.setItem(leadStorageKey,JSON.stringify({submitted:true,data:leadDraft}));}catch{storageWorks=false;}startQuiz();}catch{error.textContent='Не получилось сохранить данные. Проверь интернет и попробуй ещё раз.';button.disabled=false;button.innerHTML=`ПЕРЕЙТИ К РАЗБОРУ ${icon('arrow')}`;}finally{clearTimeout(timeout);}}
 async function persistReport(a){
  if(!leadSubmitted)return false;
- const body=new URLSearchParams({leadId:leadId(),answers:JSON.stringify(a)});
+ const body=reportPayload(a);
  const response=await apiPost('/api/reports',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,keepalive:true});
  if(response.type!=='opaque'){const result=await response.json().catch(()=>null);if(!response.ok||result?.ok!==true)throw new Error('save-report');}
  return true;
+}
+function reportPayload(a){return new URLSearchParams({leadId:leadId(),answers:JSON.stringify(a)});}
+function beaconReport(a){
+ if(!leadSubmitted||typeof navigator.sendBeacon!=='function')return false;
+ try{return navigator.sendBeacon(apiUrl('/api/reports'),reportPayload(a));}catch{return false;}
 }
 async function completeAudit(){
  if(!isComplete(answers)){position=QUESTIONS.findIndex(q=>!answers[q.id]);quiz();return;}
  completedAt=new Date().toISOString();save();
  const button=document.getElementById('next-button')||document.querySelector('[data-action="finish"]');
  if(button){button.disabled=true;button.textContent='ГОТОВИМ КАРТУ';}
+ beaconReport(answers);
  let saved=true;
  try{await persistReport(answers);}catch{saved=false;}
  showReport(answers,false);
@@ -552,7 +558,7 @@ let lastFocus=null;
 function modal(title,body,actions){lastFocus=document.activeElement;document.getElementById('overlay').innerHTML=`<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><h2 id="modal-title">${title}</h2><p>${body}</p><div class="modal-actions">${actions}</div></section></div>`;document.querySelector('.modal button')?.focus();}
 function closeModal(){document.getElementById('overlay').innerHTML='';lastFocus?.focus();}
 function resetConfirm(){modal('Начать с чистого листа?','Текущие ответы и карта в этом браузере будут заменены. Если хочешь сохранить результат, сначала скачай карту.','<button class="secondary" data-action="close">Оставить ответы</button><button class="primary" data-action="confirm-reset">Начать заново</button>');}
-app.addEventListener('click',event=>{const option=event.target.closest('[data-answer]');if(option){selectAnswer(option.dataset.answer);return;}const el=event.target.closest('[data-action]');if(!el)return;const action=el.dataset.action;if(action==='home')home();else if(action==='start')start();else if(action==='next')next();else if(action==='finish'){if(isComplete(answers))void completeAudit();}else if(action==='back'){position=Math.max(0,position-1);quiz();}else if(action==='demo')showReport(demoAnswers('energy'),true);else if(action==='result'){void persistReport(answers).catch(()=>{});showReport(answers);}else if(action==='download')download();else if(action==='print')window.print();else if(action==='edit'){demo=false;position=0;quiz();}else if(action==='reset')resetConfirm();else if(action==='confirm-reset'){answers={};position=0;completedAt=null;demo=false;save();startQuiz();}else if(action==='close')closeModal();});
+app.addEventListener('click',event=>{const option=event.target.closest('[data-answer]');if(option){selectAnswer(option.dataset.answer);return;}const el=event.target.closest('[data-action]');if(!el)return;const action=el.dataset.action;if(action==='home')home();else if(action==='start')start();else if(action==='next')next();else if(action==='finish'){if(isComplete(answers))void completeAudit();}else if(action==='back'){position=Math.max(0,position-1);quiz();}else if(action==='demo')showReport(demoAnswers('energy'),true);else if(action==='result'){beaconReport(answers);void persistReport(answers).catch(()=>{});showReport(answers);}else if(action==='download')download();else if(action==='print')window.print();else if(action==='edit'){demo=false;position=0;quiz();}else if(action==='reset')resetConfirm();else if(action==='confirm-reset'){answers={};position=0;completedAt=null;demo=false;save();startQuiz();}else if(action==='close')closeModal();});
 app.addEventListener('submit',event=>{if(event.target.id!=='lead-form')return;event.preventDefault();submitLead(event.target);});
 document.addEventListener('keydown',event=>{
  const dialog=document.querySelector('.modal');
